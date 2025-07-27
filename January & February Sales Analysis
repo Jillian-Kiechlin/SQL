@@ -1,0 +1,50 @@
+#In this SQL, I'm querying a database with multiple tables in it to quantify statistics about customer and order data. 
+
+--How many many unique orders were placed in January?--
+SELECT COUNT(DISTINCT jansales.orderID)
+FROM bit_db.jansales
+WHERE length(orderid)=6
+AND orderid <>"Order ID";
+
+--How many of those orders where for an iPhone?
+SELECT COUNT(DISTINCT orderid)
+FROM jansales
+WHERE product='iPhone'
+AND length(orderid) = 6
+AND orderid <> 'Order ID';
+
+--Select the customer account numbers for all the orders that were placed in February.--
+SELECT DISTINCT acctnum
+FROM customers
+    INNER JOIN febsales
+    ON customers.order_id=febsales.orderID
+WHERE febsales.orderdate<>'Order Date'
+AND length(febsales.orderid) = 6;
+
+--Which product was the cheapest one sold in January, and what was the price?--
+SELECT DISTINCT product, price
+FROM jansales
+ORDER BY price ASC
+LIMIT 1;
+
+--What is the total revenue for each product sold in January?-
+SELECT SUM(quantity)*price AS revenue, product
+FROM jansales
+GROUP BY product;
+
+--Which products were sold in February at 548 Lincoln St, Seattle, WA 98101, 
+--how many of each were sold, and what was the total revenue?
+SELECT product, SUM(quantity),SUM(quantity)*price AS revenue
+FROM febsales
+WHERE location LIKE '%548 Lincoln St%';
+
+--How many customers ordered more than 2 products at a time in February, 
+--and what was the average amount spent for those customers?
+SELECT COUNT(DISTINCT customers.acctnum), AVG(febsales.quantity*febsales.price)
+FROM customers
+     INNER JOIN febsales
+     ON customers.order_id=febsales.orderID
+ WHERE febsales.quantity>2
+ AND length(orderid) = 6
+AND orderid <> 'Order ID';
+
