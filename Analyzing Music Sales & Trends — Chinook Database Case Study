@@ -1,0 +1,120 @@
+Goal: Demonstrate the ability to use SQL to extract business insights from a music store database. 
+This analysis covers customer behavior, revenue drivers, and artist/genre performance.
+
+Database Overview
+Name: Chinook Database
+
+Description:
+The Chinook database models a digital music store, containing data on artists, albums, tracks, customers, invoices, playlists, and genres. 
+It is frequently used for practicing SQL queries and data analysis on sales and music catalog information.
+
+Business Context:
+The dataset represents a fictional store that sells individual music tracks online. 
+It includes sales transactions, product details, and customer information, making it ideal for exploring business questions about 
+revenue, customer behavior, and music trends.
+
+Key Tables Used in This Analysis:
+    Customers – Customer demographic and contact information.
+    Invoices – Purchase transactions with invoice dates, billing location, and customer links.
+    Invoice_Items – Line-item details for each invoice, including track purchased, price, and quantity.
+    Tracks – Track-level data including name, album, genre, and composer.
+    Albums – Album-level data linked to artists.
+    Artists – Artist names and identifiers.
+    Genres – Music genre categories.
+    Playlists / Playlist_Track – Playlist metadata and the tracks included in each playlist.
+
+Skills Demonstrated:
+    Complex JOINs across multiple tables
+    Aggregation with SUM, AVG, and COUNT
+    Subqueries for filtering based on aggregated data
+    Data ranking using ORDER BY and LIMIT
+    Combining business logic with SQL to answer targeted questions
+
+
+--US billed tracks in July 2013
+SELECT DISTINCT invoice_items.TrackId, tracks.Name, invoices.BillingCountry,invoices.InvoiceDate
+FROM invoices
+    LEFT JOIN invoice_items
+    ON invoices.InvoiceId=invoice_items.InvoiceId
+        LEFT JOIN tracks
+        ON invoice_items.TrackId=tracks.TrackId
+WHERE invoices.BillingCountry="USA"
+AND InvoiceDate >= '2013-07-01' AND InvoiceDate < '2013-08-01'
+ORDER BY tracks.trackid;
+
+--How many times each of those tracks were billed
+SELECT tracks.TrackId, tracks.Name, COUNT(*) AS TimesBilled
+FROM invoices
+JOIN invoice_items ON invoices.InvoiceId = invoice_items.InvoiceId
+JOIN tracks ON invoice_items.TrackId = tracks.TrackId
+WHERE invoices.BillingCountry = 'USA'
+  AND invoices.InvoiceDate >= '2013-07-01'
+  AND invoices.InvoiceDate < '2013-08-01'
+GROUP BY tracks.TrackId, tracks.Name
+ORDER BY TimesBilled DESC;
+
+--Which tracks generated the highest total revenue?
+SELECT tracks.trackid, tracks.name, COUNT(*) AS Times_Sold, SUM(invoice_items.UnitPrice * invoice_items.Quantity) AS Total_Revenue
+FROM tracks
+    INNER JOIN invoice_items 
+    ON invoice_items.TrackId = tracks.TrackId
+    INNER JOIN invoices 
+    ON invoices.InvoiceId = invoice_items.InvoiceId
+GROUP BY tracks.TrackId
+ORDER BY Total_revenue DESC;
+
+--What is the average total amount spent in a transaction?
+SELECT AVG(invoice_total) AS avg_invoice_total
+FROM (
+    SELECT invoices.InvoiceId, SUM(invoice_items.UnitPrice * invoice_items.Quantity) AS invoice_total
+    FROM invoice_items
+    JOIN invoices ON invoices.InvoiceId = invoice_items.InvoiceId
+    GROUP BY invoices.InvoiceId
+) AS invoice_totals;
+    
+--Which customers spent more than the average?
+SELECT customer_totals.CustomerId, customer_totals.total_sale
+FROM (SELECT customers.customerid, SUM (invoice_items.UnitPrice*invoice_items.Quantity) AS total_sale
+    FROM invoice_items
+    INNER JOIN invoices
+    ON invoices.InvoiceId = invoice_items.InvoiceId
+    INNER JOIN customers
+    ON customers.customerid=invoices.customerid
+    GROUP BY customers.CustomerId)AS customer_totals
+WHERE customer_totals.total_sale > (SELECT AVG(inner.total_sale)FROM 
+        (SELECT customers.CustomerId, SUM(invoice_items.UnitPrice * invoice_items.Quantity) AS total_sale
+        FROM invoice_items
+        JOIN invoices ON invoices.InvoiceId = invoice_items.InvoiceId
+        JOIN customers ON customers.CustomerId = invoices.CustomerId
+        GROUP BY customers.CustomerId)AS inner)
+;
+
+--What genre is generating the most revenue overall?
+SELECT tracks.GenreId, genres.name, SUM(invoice_items.UnitPrice*invoice_items.Quantity)AS revenue_per_genre
+FROM tracks
+    JOIN invoice_items ON tracks.TrackId=invoice_items.TrackId
+    JOIN genres ON genres.GenreId=tracks.GenreId
+GROUP BY genres.Name
+ORDER BY revenue_per_genre DESC;
+
+--Which artist has generated the most revenue across all tracks?
+SELECT artists.Name, SUM(invoice_items.UnitPrice*invoice_items.Quantity) AS total_revenue
+FROM artists
+    JOIN albums ON artists.ArtistId=albums.ArtistId
+    JOIN tracks ON albums.AlbumId=tracks.albumid
+    JOIN invoice_items ON tracks.TrackId=invoice_items.TrackId
+GROUP BY artists.ArtistId
+ORDER BY SUM(invoice_items.UnitPrice*invoice_items.Quantity) DESC
+LIMIT 1;
+
+--What are the top 5 artists most featured in playlists? How many playlists are they in?
+SELECT artists.Name, COUNT(DISTINCT playlists.PlaylistId) AS featured_playlists_count
+FROM artists
+    JOIN albums ON artists.ArtistId=albums.ArtistId
+    JOIN tracks ON albums.AlbumId=tracks.AlbumId
+    JOIN playlist_track ON tracks.TrackId=playlist_track.TrackId
+    JOIN playlists ON playlist_track.PlaylistId=playlists.PlaylistId
+GROUP BY artists.name
+ORDER BY featured_playlists_count DESC
+LIMIT 5;
+
